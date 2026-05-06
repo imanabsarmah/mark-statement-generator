@@ -1,0 +1,1142 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mark Statement Generator</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg: #f5f2ed;
+  --card: #ffffff;
+  --border: #ddd8d0;
+  --border-strong: #bbb5aa;
+  --text: #1c1917;
+  --text-muted: #78716c;
+  --text-faint: #a8a29e;
+  --accent: #2c5f8a;
+  --accent-light: #e8f0f8;
+  --success-bg: #e8f5ec;
+  --success-text: #1e6e32;
+  --success-border: #a8d8b4;
+  --warn-bg: #fff8e0;
+  --warn-text: #7a5c00;
+  --warn-border: #f0d878;
+  --danger-bg: #fef2f2;
+  --danger-text: #c0392b;
+  --danger-border: #f5c6c6;
+  --radius: 8px;
+  --radius-lg: 12px;
+  --shadow: 0 2px 16px rgba(0,0,0,0.08);
+}
+
+body {
+  font-family: 'Georgia', 'Times New Roman', serif;
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+  padding: 2rem 1rem 4rem;
+}
+
+.app { max-width: 860px; margin: 0 auto; }
+
+/* ── Page header ── */
+.page-header { text-align: center; margin-bottom: 2.5rem; }
+.page-header h1 { font-size: 26px; font-weight: 700; letter-spacing: -0.02em; }
+.page-header p { font-size: 13px; color: var(--text-muted); margin-top: 6px; }
+
+/* ── Setup card ── */
+.setup-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 1.75rem 2rem;
+  box-shadow: var(--shadow);
+  margin-bottom: 1.5rem;
+}
+.setup-card h2 {
+  font-size: 11px; font-weight: 700;
+  text-transform: uppercase; letter-spacing: 0.1em;
+  color: var(--text-muted); margin-bottom: 1.25rem;
+}
+
+/* ── School info ── */
+.school-fields { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 1.5rem; }
+.field-group { display: flex; flex-direction: column; gap: 5px; }
+.field-group label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.07em; color: var(--text-muted); }
+.field-group input, .field-group select, .field-group textarea {
+  padding: 8px 12px; font-size: 14px; font-family: Georgia, serif;
+  border: 1px solid var(--border); border-radius: var(--radius);
+  background: #faf9f7; color: var(--text); outline: none; transition: border-color 0.15s;
+}
+.field-group input:focus, .field-group select:focus, .field-group textarea:focus {
+  border-color: var(--accent); background: #fff;
+}
+.field-group.full { grid-column: 1 / -1; }
+
+/* ── Logo upload ── */
+.logo-upload-area {
+  display: flex; align-items: center; gap: 14px;
+  padding: 12px 14px; border: 1px dashed var(--border-strong);
+  border-radius: var(--radius); background: #faf9f7; cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+}
+.logo-upload-area:hover { border-color: var(--accent); background: var(--accent-light); }
+.logo-upload-area input { display: none; }
+.logo-preview { width: 52px; height: 52px; border-radius: 6px; object-fit: contain; border: 1px solid var(--border); background: #fff; display: none; }
+.logo-placeholder { width: 52px; height: 52px; border-radius: 6px; border: 1px solid var(--border); background: #fff; display: flex; align-items: center; justify-content: center; font-size: 22px; color: var(--text-faint); }
+.logo-text h4 { font-size: 14px; font-weight: 600; color: var(--text); margin-bottom: 2px; }
+.logo-text p { font-size: 12px; color: var(--text-muted); }
+.logo-remove { margin-left: auto; background: none; border: 1px solid var(--border); border-radius: var(--radius); padding: 5px 10px; font-size: 12px; color: var(--text-muted); cursor: pointer; display: none; }
+.logo-remove:hover { background: var(--danger-bg); color: var(--danger-text); border-color: var(--danger-border); }
+
+/* ── Drop zone ── */
+.drop-zone {
+  border: 2px dashed var(--border-strong); border-radius: var(--radius-lg);
+  padding: 2.5rem 1.5rem; text-align: center; cursor: pointer;
+  transition: border-color 0.2s, background 0.2s; background: #faf9f7; position: relative;
+}
+.drop-zone:hover, .drop-zone.dragover { border-color: var(--accent); background: var(--accent-light); }
+.drop-zone input[type="file"] { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%; }
+.drop-icon { font-size: 36px; margin-bottom: 10px; }
+.drop-zone h3 { font-size: 16px; font-weight: 600; margin-bottom: 4px; }
+.drop-zone p { font-size: 13px; color: var(--text-muted); }
+.drop-zone .formats { font-size: 11px; color: var(--text-faint); margin-top: 8px; }
+
+.file-status {
+  display: none; align-items: center; gap: 12px; padding: 12px 16px;
+  background: var(--success-bg); border: 1px solid var(--success-border);
+  border-radius: var(--radius); margin-top: 1rem; font-size: 13px; color: var(--success-text);
+}
+.file-status.show { display: flex; }
+.file-status .fname { font-weight: 700; }
+.file-status .dismiss { margin-left: auto; cursor: pointer; color: var(--success-text); font-size: 18px; line-height: 1; background: none; border: none; }
+
+.sheet-picker { display: none; margin-top: 1rem; }
+.sheet-picker.show { display: block; }
+.sheet-picker label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.07em; color: var(--text-muted); display: block; margin-bottom: 6px; }
+.sheet-picker select { width: 100%; padding: 9px 12px; font-size: 14px; font-family: Georgia, serif; border: 1px solid var(--border); border-radius: var(--radius); background: #fff; color: var(--text); outline: none; }
+
+/* ── Col map & subjects ── */
+.col-map, .subjects-config, .pass-config, .coscholastic-config { display: none; margin-top: 1.25rem; }
+.col-map.show, .subjects-config.show, .pass-config.show, .coscholastic-config.show { display: block; }
+.col-map h3, .subjects-config h3, .pass-config h3, .coscholastic-config h3 {
+  font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em;
+  color: var(--text-muted); margin-bottom: 10px;
+}
+.col-map-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 10px; }
+.col-map-grid .field-group select { padding: 7px 10px; font-size: 13px; }
+
+.subject-rows { display: flex; flex-direction: column; gap: 6px; }
+.subject-row { display: flex; align-items: center; gap: 8px; }
+.subject-row input[type="text"] { flex: 1; padding: 7px 10px; font-size: 13px; font-family: Georgia, serif; border: 1px solid var(--border); border-radius: var(--radius); background: #faf9f7; color: var(--text); outline: none; }
+.subject-row input:focus { border-color: var(--accent); background: #fff; }
+.subject-row select { flex: 1; padding: 7px 10px; font-size: 13px; font-family: Georgia, serif; border: 1px solid var(--border); border-radius: var(--radius); background: #faf9f7; color: var(--text); outline: none; }
+.subject-row .del-btn { background: none; border: 1px solid var(--border); border-radius: var(--radius); padding: 6px 9px; cursor: pointer; color: var(--text-muted); font-size: 16px; line-height: 1; }
+.subject-row .del-btn:hover { background: var(--danger-bg); color: var(--danger-text); border-color: var(--danger-border); }
+.add-subj-btn { margin-top: 8px; background: none; border: 1px dashed var(--border-strong); border-radius: var(--radius); padding: 7px 14px; font-size: 13px; font-family: Georgia, serif; color: var(--text-muted); cursor: pointer; transition: 0.15s; }
+.add-subj-btn:hover { border-color: var(--accent); color: var(--accent); background: var(--accent-light); }
+
+/* ── Pass/Fail config ── */
+.pass-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.pass-row label { font-size: 13px; color: var(--text-muted); }
+.pass-row input[type="number"] { width: 80px; padding: 7px 10px; font-size: 13px; font-family: Georgia, serif; border: 1px solid var(--border); border-radius: var(--radius); background: #faf9f7; outline: none; }
+.pass-row input:focus { border-color: var(--accent); background: #fff; }
+
+/* ── Co-scholastic ── */
+.coscho-rows { display: flex; flex-direction: column; gap: 6px; }
+.coscho-row { display: flex; align-items: center; gap: 8px; }
+.coscho-row input { flex: 1; padding: 7px 10px; font-size: 13px; font-family: Georgia, serif; border: 1px solid var(--border); border-radius: var(--radius); background: #faf9f7; outline: none; }
+.coscho-row input:focus { border-color: var(--accent); background: #fff; }
+.coscho-row .del-btn { background: none; border: 1px solid var(--border); border-radius: var(--radius); padding: 6px 9px; cursor: pointer; color: var(--text-muted); font-size: 16px; line-height: 1; }
+.coscho-row .del-btn:hover { background: var(--danger-bg); color: var(--danger-text); }
+.toggle-row { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+.toggle-label { font-size: 13px; color: var(--text-muted); }
+.toggle { position: relative; width: 40px; height: 22px; }
+.toggle input { opacity: 0; width: 0; height: 0; }
+.toggle-slider { position: absolute; inset: 0; background: var(--border-strong); border-radius: 22px; cursor: pointer; transition: background 0.2s; }
+.toggle-slider::before { content: ''; position: absolute; width: 16px; height: 16px; left: 3px; top: 3px; background: white; border-radius: 50%; transition: transform 0.2s; }
+.toggle input:checked + .toggle-slider { background: var(--accent); }
+.toggle input:checked + .toggle-slider::before { transform: translateX(18px); }
+
+/* ── Divider ── */
+.section-divider { border: none; border-top: 0.5px solid var(--border); margin: 1.5rem 0; }
+
+/* ── Controls row ── */
+.controls-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 1.5rem; }
+.controls-row label { font-size: 14px; color: var(--text-muted); white-space: nowrap; }
+.controls-row select { flex: 1; min-width: 220px; padding: 9px 12px; font-size: 14px; font-family: Georgia, serif; border: 1px solid var(--border); border-radius: var(--radius); background: #fff; color: var(--text); outline: none; }
+.controls-row select:focus { border-color: var(--accent); }
+
+.btn { display: inline-flex; align-items: center; gap: 6px; padding: 9px 18px; font-size: 14px; font-family: Georgia, serif; border: 1px solid var(--border-strong); border-radius: var(--radius); background: #fff; color: var(--text); cursor: pointer; white-space: nowrap; transition: background 0.15s, border-color 0.15s; }
+.btn:hover { background: #f0ede8; border-color: var(--accent); }
+.btn:active { transform: scale(0.98); }
+.btn.primary { background: var(--accent); color: #fff; border-color: var(--accent); }
+.btn.primary:hover { background: #1d4d70; }
+.btn.success { background: var(--success-bg); color: var(--success-text); border-color: var(--success-border); }
+.btn.success:hover { background: #d2edd8; }
+
+/* ── Error / info ── */
+.error-msg { display: none; padding: 12px 16px; background: var(--danger-bg); border: 1px solid var(--danger-border); border-radius: var(--radius); font-size: 13px; color: var(--danger-text); margin-bottom: 1rem; }
+.error-msg.show { display: block; }
+
+/* ── Statement card ── */
+.statement-wrap { display: none; }
+.statement-wrap.show { display: block; }
+
+.statement-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 2.5rem 2.25rem;
+  box-shadow: var(--shadow);
+}
+
+.stmt-top {
+  display: flex; align-items: flex-start; justify-content: space-between; gap: 1.5rem;
+  border-bottom: 2px solid var(--text); padding-bottom: 1.25rem; margin-bottom: 1.5rem;
+}
+.stmt-logo-name { display: flex; align-items: center; gap: 14px; flex: 1; }
+.stmt-logo { width: 60px; height: 60px; object-fit: contain; border-radius: 6px; display: none; }
+.stmt-school-name { font-size: 20px; font-weight: 700; }
+.stmt-school-sub { font-size: 13px; color: var(--text-muted); margin-top: 2px; }
+.stmt-doc-title { text-align: right; }
+.stmt-doc-title h2 { font-size: 18px; font-weight: 700; }
+.stmt-doc-title p { font-size: 12px; color: var(--text-muted); margin-top: 2px; }
+
+.student-meta { display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px 12px; margin-bottom: 1.5rem; padding: 1rem 1.25rem; background: #faf9f7; border-radius: var(--radius); border: 1px solid var(--border); }
+.meta-item .meta-label { font-size: 10px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-faint); margin-bottom: 3px; }
+.meta-item .meta-val { font-size: 13px; font-weight: 700; }
+
+table.marks-table { width: 100%; border-collapse: collapse; font-size: 13px; margin-bottom: 1.5rem; table-layout: fixed; }
+.marks-table thead tr { border-bottom: 1px solid var(--border-strong); }
+.marks-table th { text-align: left; padding: 8px 8px; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.07em; color: var(--text-muted); }
+.marks-table th:not(:first-child) { text-align: center; }
+.marks-table td { padding: 9px 8px; border-bottom: 0.5px solid #eee; }
+.marks-table td:not(:first-child) { text-align: center; }
+.marks-table td.editable-mark { cursor: pointer; transition: background 0.15s; }
+.marks-table td.editable-mark:hover { background: var(--accent-light); }
+.marks-table td.editable-mark input { width: 60px; text-align: center; padding: 2px 4px; font-size: 13px; font-family: Georgia, serif; border: 1px solid var(--accent); border-radius: 4px; outline: none; background: #fff; }
+.marks-table tfoot tr { border-top: 2px solid var(--text); background: #faf9f7; }
+.marks-table tfoot td { padding: 10px 8px; font-weight: 700; border-bottom: none; }
+.fail-row { background: #fff8f8 !important; }
+.fail-mark { color: var(--danger-text) !important; font-weight: 700; }
+
+.grade { font-weight: 700; }
+.g-A1 { color: #155c28; } .g-A2 { color: #1a7035; }
+.g-B1 { color: #1a4fa0; } .g-B2 { color: #1e66c8; }
+.g-C1 { color: #8a6200; } .g-C2 { color: #9a7000; }
+.g-D  { color: var(--warn-text); } .g-E  { color: var(--danger-text); }
+
+.result-row { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; margin-top: 0.5rem; }
+.result-badge { padding: 5px 18px; border-radius: var(--radius); font-size: 13px; font-weight: 700; }
+.badge-promoted { background: var(--success-bg); color: var(--success-text); border: 1px solid var(--success-border); }
+.badge-fail { background: var(--danger-bg); color: var(--danger-text); border: 1px solid var(--danger-border); }
+.badge-consideration { background: var(--warn-bg); color: var(--warn-text); border: 1px solid var(--warn-border); }
+.badge-other { background: #f0f0f0; color: #555; border: 1px solid #ccc; }
+.result-note { font-size: 11px; color: var(--text-faint); }
+
+/* ── Remarks box ── */
+.remarks-section { margin-top: 1.25rem; }
+.remarks-section label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.07em; color: var(--text-muted); display: block; margin-bottom: 6px; }
+.remarks-input { width: 100%; padding: 8px 12px; font-size: 13px; font-family: Georgia, serif; border: 1px solid var(--border); border-radius: var(--radius); background: #faf9f7; color: var(--text); outline: none; resize: vertical; min-height: 60px; transition: border-color 0.15s; }
+.remarks-input:focus { border-color: var(--accent); background: #fff; }
+.remarks-display { display: none; margin-top: 1.25rem; padding-top: 1rem; border-top: 0.5px solid var(--border); font-size: 13px; }
+.remarks-display .remarks-label { font-size: 10px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-faint); margin-bottom: 4px; }
+.remarks-display .remarks-text { color: var(--text); font-style: italic; }
+
+/* ── Co-scholastic table ── */
+.coscho-section { display: none; margin-top: 1.25rem; }
+.coscho-section.show { display: block; }
+.coscho-section h4 { font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-muted); margin-bottom: 8px; font-weight: 700; }
+table.coscho-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.coscho-table td { padding: 7px 10px; border-bottom: 0.5px solid #eee; }
+.coscho-table td:first-child { color: var(--text-muted); width: 55%; }
+.coscho-table td:last-child { text-align: center; }
+.coscho-grade-input { width: 80px; text-align: center; padding: 4px 8px; font-size: 13px; font-family: Georgia, serif; border: 1px solid var(--border); border-radius: var(--radius); background: #faf9f7; outline: none; }
+.coscho-grade-input:focus { border-color: var(--accent); background: #fff; }
+
+/* ── Signature ── */
+.signature-row { margin-top: 2.5rem; padding-top: 1.25rem; border-top: 0.5px solid var(--border); display: flex; justify-content: space-between; font-size: 11px; color: var(--text-faint); letter-spacing: 0.04em; }
+
+/* ── Grade key ── */
+.grade-key { margin-top: 1.25rem; padding: 0.75rem 1rem; background: #faf9f7; border: 1px solid var(--border); border-radius: var(--radius); font-size: 11px; color: var(--text-muted); display: flex; flex-wrap: wrap; gap: 6px 16px; }
+.grade-key strong { color: var(--text); }
+
+/* ── Print ── */
+@media print {
+  body { background: #fff; padding: 0; }
+  .setup-card, .controls-row, .page-header, .grade-key,
+  .remarks-section, .no-print { display: none !important; }
+  .statement-card { box-shadow: none; border: none; padding: 0.5rem 0; border-radius: 0; }
+  .app { max-width: 100%; }
+  .marks-table td.editable-mark input { border: none; background: transparent; width: auto; }
+  .remarks-display { display: block !important; }
+  .coscho-grade-input { border: none; background: transparent; }
+  /* Page break between students when printing all */
+  .page-break { page-break-before: always; }
+}
+
+/* ── Print-all container ── */
+#printAllContainer { display: none; }
+#printAllContainer .statement-card { margin-bottom: 0; border-radius: 0; border-left: none; border-right: none; box-shadow: none; }
+
+@media (max-width: 600px) {
+  .school-fields { grid-template-columns: 1fr; }
+  .student-meta { grid-template-columns: 1fr 1fr; }
+  .statement-card { padding: 1.5rem 1rem; }
+  .stmt-top { flex-direction: column; }
+  .stmt-doc-title { text-align: left; }
+}
+</style>
+</head>
+<body>
+<div class="app">
+
+<div class="page-header">
+  <h1>Mark Statement Generator</h1>
+  <p>Upload any class's final result sheet — generate individual or bulk mark statements</p>
+</div>
+
+<!-- ══ Setup Card ══ -->
+<div class="setup-card">
+  <h2>1. School Details</h2>
+
+  <div style="margin-bottom:1.25rem;">
+    <div class="logo-upload-area" onclick="document.getElementById('logoInput').click()">
+      <input type="file" id="logoInput" accept="image/*" onchange="handleLogo(this)">
+      <img id="logoPreview" class="logo-preview" src="" alt="School logo">
+      <div class="logo-placeholder" id="logoPlaceholder">🏫</div>
+      <div class="logo-text">
+        <h4>School Logo</h4>
+        <p>Click to upload (PNG, JPG — optional)</p>
+      </div>
+      <button class="logo-remove" id="logoRemove" onclick="removeLogo(event)">Remove</button>
+    </div>
+  </div>
+
+  <div class="school-fields">
+    <div class="field-group full">
+      <label>School Name</label>
+      <input type="text" id="schoolName" placeholder="e.g. Kendriya Vidyalaya No. 1, Silchar">
+    </div>
+    <div class="field-group">
+      <label>Class</label>
+      <input type="text" id="className" placeholder="e.g. Class IX">
+    </div>
+    <div class="field-group">
+      <label>Academic Year</label>
+      <input type="text" id="academicYear" placeholder="e.g. 2025–26">
+    </div>
+    <div class="field-group">
+      <label>Examination Name</label>
+      <input type="text" id="examName" placeholder="e.g. First Terminal Examination">
+    </div>
+    <div class="field-group">
+      <label>Language</label>
+      <select id="langSelect" onchange="applyLanguage()">
+        <option value="en">English</option>
+        <option value="hi">हिन्दी (Hindi)</option>
+      </select>
+    </div>
+  </div>
+
+  <hr class="section-divider">
+  <h2>2. Pass / Fail Thresholds</h2>
+  <div class="pass-config show">
+    <div class="pass-row">
+      <label>Min % to pass overall</label>
+      <input type="number" id="minOverallPct" value="33" min="0" max="100">
+      <label style="margin-left:12px;">Min marks per subject (out of 100)</label>
+      <input type="number" id="minSubjectMarks" value="33" min="0" max="100">
+    </div>
+    <p style="font-size:12px;color:var(--text-faint);margin-top:8px;">Students below these thresholds will be flagged as Fail on the statement.</p>
+  </div>
+
+  <hr class="section-divider">
+  <h2>3. Co-Scholastic Activities</h2>
+  <div class="coscholastic-config show">
+    <div class="toggle-row">
+      <label class="toggle">
+        <input type="checkbox" id="cosChoToggle" onchange="toggleCoscho()">
+        <span class="toggle-slider"></span>
+      </label>
+      <span class="toggle-label">Show co-scholastic section on statements</span>
+    </div>
+    <div id="cosChoFields" style="display:none;">
+      <p style="font-size:12px;color:var(--text-muted);margin-bottom:10px;">Add activity rows. Grades are entered per-student at print time.</p>
+      <div class="coscho-rows" id="coschoRows"></div>
+      <button class="add-subj-btn" onclick="addCoschoRow()">+ Add activity</button>
+    </div>
+  </div>
+
+  <hr class="section-divider">
+  <h2>4. Upload Result Sheet</h2>
+
+  <div class="drop-zone" id="dropZone">
+    <input type="file" id="fileInput" accept=".xls,.xlsx,.csv" onchange="handleFile(this.files[0])">
+    <div class="drop-icon">📊</div>
+    <h3>Drop your file here or click to browse</h3>
+    <p>Upload the Final Result sheet from your Excel workbook</p>
+    <p class="formats">Supported: .xls · .xlsx · .csv</p>
+  </div>
+
+  <div class="file-status" id="fileStatus">
+    <span>✅</span>
+    <span>Loaded: <span class="fname" id="fileName"></span></span>
+    <button class="dismiss" onclick="resetFile()">×</button>
+  </div>
+
+  <div class="sheet-picker" id="sheetPicker">
+    <label for="sheetSelect">Select Sheet (pick the Final Result sheet)</label>
+    <select id="sheetSelect" onchange="loadSheet()"></select>
+  </div>
+
+  <div class="col-map" id="colMap">
+    <hr class="section-divider">
+    <h3>5. Map Columns</h3>
+    <p style="font-size:12px;color:var(--text-muted);margin-bottom:10px;">Auto-detected below — adjust if needed.</p>
+    <div class="col-map-grid" id="colMapGrid"></div>
+  </div>
+
+  <div class="subjects-config" id="subjectsConfig">
+    <hr class="section-divider">
+    <h3>6. Subjects &amp; Columns</h3>
+    <p style="font-size:12px;color:var(--text-muted);margin-bottom:10px;">Each row = one subject. Set the display name and which column holds its marks.</p>
+    <div class="subject-rows" id="subjectRows"></div>
+    <button class="add-subj-btn" onclick="addSubjectRow()">+ Add subject</button>
+  </div>
+</div>
+
+<!-- ══ Controls ══ -->
+<div id="errorMsg" class="error-msg"></div>
+
+<div class="controls-row no-print" id="controlsRow" style="display:none;">
+  <label for="studentSelect">Select Student</label>
+  <select id="studentSelect" onchange="showStatement()">
+    <option value="">— Choose a student —</option>
+  </select>
+  <button class="btn" id="printBtn" onclick="printSingle()" style="display:none;">🖨 Print Statement</button>
+  <button class="btn success no-print" id="printAllBtn" onclick="printAll()" style="display:none;">📋 Print All</button>
+</div>
+
+<!-- ══ Single Statement ══ -->
+<div class="statement-wrap" id="statementWrap">
+  <div class="statement-card" id="statementCard">
+
+    <div class="stmt-top">
+      <div class="stmt-logo-name">
+        <img id="stmtLogo" class="stmt-logo" src="" alt="Logo">
+        <div>
+          <div class="stmt-school-name" id="disp-school"></div>
+          <div class="stmt-school-sub" id="disp-class-year"></div>
+        </div>
+      </div>
+      <div class="stmt-doc-title">
+        <h2 id="lbl-title">Mark Statement</h2>
+        <p id="disp-exam-name" style="font-size:12px;color:var(--text-muted);margin-top:2px;font-style:italic;"></p>
+        <p id="disp-acad-year" style="font-size:12px;color:var(--text-muted);margin-top:1px;"></p>
+      </div>
+    </div>
+
+    <div class="student-meta" id="studentMeta"></div>
+
+    <table class="marks-table">
+      <thead>
+        <tr>
+          <th style="width:38%;" id="lbl-subject">Subject</th>
+          <th style="width:22%;" id="lbl-marks">Marks (out of 100)</th>
+          <th style="width:16%;" id="lbl-pct-col">Percentage</th>
+          <th style="width:12%;" id="lbl-grade-col">Grade</th>
+          <th style="width:12%;" id="lbl-status-col">Status</th>
+        </tr>
+      </thead>
+      <tbody id="subjectTableRows"></tbody>
+      <tfoot>
+        <tr>
+          <td id="lbl-total-row">Total</td>
+          <td id="st-total"></td>
+          <td id="st-pct"></td>
+          <td id="st-overall-grade"></td>
+          <td id="st-overall-status"></td>
+        </tr>
+      </tfoot>
+    </table>
+
+    <div class="result-row">
+      <div id="resultBadge" class="result-badge"></div>
+      <span class="result-note" id="totalNote"></span>
+    </div>
+
+    <!-- Co-scholastic -->
+    <div class="coscho-section" id="coschoDisplay">
+      <hr class="section-divider">
+      <h4 id="lbl-coscho">Co-Scholastic Activities</h4>
+      <table class="coscho-table" id="coschoTable"></table>
+    </div>
+
+    <div class="signature-row">
+      <span id="lbl-class-teacher">Class Teacher's Signature</span>
+      <span id="lbl-principal">Principal's Signature</span>
+    </div>
+
+  </div>
+
+  <div class="grade-key no-print">
+    <strong>Grade Scale:</strong>
+    <span>A1 ≥ 91%</span><span>A2 ≥ 81%</span><span>B1 ≥ 71%</span>
+    <span>B2 ≥ 61%</span><span>C1 ≥ 51%</span><span>C2 ≥ 41%</span>
+    <span>D ≥ 33%</span><span>E &lt; 33%</span>
+  </div>
+</div>
+
+<!-- ══ Print-All hidden container ══ -->
+<div id="printAllContainer"></div>
+
+<script>
+// ═══════════════════════════════════════════════════
+// STATE
+// ═══════════════════════════════════════════════════
+let workbook = null, sheetData = [], headers = [], students = [], subjectConfig = [];
+let logoDataURL = null;
+let coschoItems = [{ label: 'Sports & Games' }, { label: 'Art & Craft' }, { label: 'Discipline' }];
+let editedMarks = {}; // studentIndex -> { subjectIndex -> overriddenValue }
+
+// ═══════════════════════════════════════════════════
+// LANGUAGE STRINGS
+// ═══════════════════════════════════════════════════
+const LANG = {
+  en: {
+    title: 'Mark Statement', final: 'Final Result',
+    subject: 'Subject', marks: 'Marks (out of 100)', pctCol: 'Percentage',
+    gradeCol: 'Grade', statusCol: 'Status', totalRow: 'Total',
+    coscho: 'Co-Scholastic Activities',
+    remarksInput: "Teacher's Remarks (optional)",
+    remarksDisp: "Teacher's Remarks",
+    classTeacher: "Class Teacher's Signature", principal: "Principal's Signature",
+    rollNo: 'Roll No.', admNo: 'Adm No.', name: 'Name', gender: 'Gender',
+    rank: 'Class Rank', pass: 'Pass', fail: 'Fail',
+    promoted: 'PROMOTED', promotedUnder: 'PROMOTED UNDER CONSIDERATION', withheld: 'Withheld',
+  },
+  hi: {
+    title: 'अंक तालिका', final: 'अंतिम परिणाम',
+    subject: 'विषय', marks: 'अंक (100 में से)', pctCol: 'प्रतिशत',
+    gradeCol: 'श्रेणी', statusCol: 'स्थिति', totalRow: 'कुल',
+    coscho: 'सह-शैक्षणिक गतिविधियाँ',
+    remarksInput: 'शिक्षक की टिप्पणी (वैकल्पिक)',
+    remarksDisp: 'शिक्षक की टिप्पणी',
+    classTeacher: 'कक्षा शिक्षक के हस्ताक्षर', principal: 'प्रधानाचार्य के हस्ताक्षर',
+    rollNo: 'क्रमांक', admNo: 'प्रवेश सं.', name: 'नाम', gender: 'लिंग',
+    rank: 'कक्षा रैंक', pass: 'उत्तीर्ण', fail: 'अनुत्तीर्ण',
+    promoted: 'PROMOTED', promotedUnder: 'PROMOTED UNDER CONSIDERATION', withheld: 'Withheld',
+  }
+};
+function L(key) { return LANG[document.getElementById('langSelect').value][key] || key; }
+function applyLanguage() {
+  const ids = ['title','final','subject','marks','pctCol','gradeCol','statusCol','totalRow','coscho','remarksInput','remarksDisp','classTeacher','principal'];
+  const lblMap = { title:'lbl-title', final:'lbl-final', subject:'lbl-subject', marks:'lbl-marks', pctCol:'lbl-pct-col', gradeCol:'lbl-grade-col', statusCol:'lbl-status-col', totalRow:'lbl-total-row', coscho:'lbl-coscho', remarksInput:'lbl-remarks-input', remarksDisp:'lbl-remarks-disp', classTeacher:'lbl-class-teacher', principal:'lbl-principal' };
+  ids.forEach(k => { const el = document.getElementById(lblMap[k]); if (el) el.textContent = L(k); });
+  if (students.length) showStatement();
+}
+
+// ═══════════════════════════════════════════════════
+// LOGO
+// ═══════════════════════════════════════════════════
+function handleLogo(input) {
+  const file = input.files[0]; if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    logoDataURL = e.target.result;
+    document.getElementById('logoPreview').src = logoDataURL;
+    document.getElementById('logoPreview').style.display = 'block';
+    document.getElementById('logoPlaceholder').style.display = 'none';
+    document.getElementById('logoRemove').style.display = 'block';
+    document.getElementById('stmtLogo').src = logoDataURL;
+    document.getElementById('stmtLogo').style.display = 'block';
+  };
+  reader.readAsDataURL(file);
+}
+function removeLogo(e) {
+  e.stopPropagation();
+  logoDataURL = null;
+  document.getElementById('logoPreview').style.display = 'none';
+  document.getElementById('logoPlaceholder').style.display = 'flex';
+  document.getElementById('logoRemove').style.display = 'none';
+  document.getElementById('stmtLogo').style.display = 'none';
+  document.getElementById('logoInput').value = '';
+}
+
+// ═══════════════════════════════════════════════════
+// CO-SCHOLASTIC
+// ═══════════════════════════════════════════════════
+function toggleCoscho() {
+  const on = document.getElementById('cosChoToggle').checked;
+  document.getElementById('cosChoFields').style.display = on ? 'block' : 'none';
+  document.getElementById('coschoDisplay').classList.toggle('show', on);
+  renderCoschoFields();
+  renderCoschoDisplay();
+}
+function addCoschoRow(label) {
+  coschoItems.push({ label: label || '' });
+  renderCoschoFields();
+  renderCoschoDisplay();
+}
+function renderCoschoFields() {
+  const c = document.getElementById('coschoRows'); c.innerHTML = '';
+  coschoItems.forEach((item, i) => {
+    const div = document.createElement('div'); div.className = 'coscho-row';
+    div.innerHTML = `<input type="text" value="${item.label}" placeholder="Activity name (e.g. Sports)" oninput="coschoItems[${i}].label=this.value;renderCoschoDisplay()">
+      <button class="del-btn" onclick="coschoItems.splice(${i},1);renderCoschoFields();renderCoschoDisplay()">×</button>`;
+    c.appendChild(div);
+  });
+}
+function renderCoschoDisplay() {
+  const table = document.getElementById('coschoTable'); table.innerHTML = '';
+  if (!document.getElementById('cosChoToggle').checked) return;
+  const idx = parseInt(document.getElementById('studentSelect').value);
+  coschoItems.forEach((item, i) => {
+    const savedKey = `coscho_${isNaN(idx)?'_':idx}_${i}`;
+    const saved = sessionStorage.getItem(savedKey) || '';
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td>${item.label || '—'}</td><td><input class="coscho-grade-input" value="${saved}" placeholder="A/B/C" oninput="sessionStorage.setItem('coscho_${isNaN(idx)?'_':idx}_${i}',this.value)"></td>`;
+    table.appendChild(tr);
+  });
+}
+renderCoschoFields();
+
+// ═══════════════════════════════════════════════════
+// FILE HANDLING
+// ═══════════════════════════════════════════════════
+const dz = document.getElementById('dropZone');
+dz.addEventListener('dragover', e => { e.preventDefault(); dz.classList.add('dragover'); });
+dz.addEventListener('dragleave', () => dz.classList.remove('dragover'));
+dz.addEventListener('drop', e => { e.preventDefault(); dz.classList.remove('dragover'); if (e.dataTransfer.files[0]) handleFile(e.dataTransfer.files[0]); });
+
+function handleFile(file) {
+  if (!file) return;
+  document.getElementById('fileName').textContent = file.name;
+  document.getElementById('fileStatus').classList.add('show');
+  const reader = new FileReader();
+  reader.onload = e => {
+    workbook = XLSX.read(new Uint8Array(e.target.result), { type: 'array' });
+    populateSheetPicker();
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+function populateSheetPicker() {
+  const sel = document.getElementById('sheetSelect'); sel.innerHTML = '';
+  workbook.SheetNames.forEach(name => {
+    const opt = document.createElement('option');
+    opt.value = name; opt.textContent = name;
+    if (/final|result/i.test(name)) opt.selected = true;
+    sel.appendChild(opt);
+  });
+  document.getElementById('sheetPicker').classList.add('show');
+  loadSheet();
+}
+
+function loadSheet() {
+  const ws = workbook.Sheets[document.getElementById('sheetSelect').value];
+  sheetData = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
+  detectAndSetup(sheetData);
+}
+
+function resetFile() {
+  workbook = null; sheetData = []; headers = []; students = [];
+  ['fileStatus','sheetPicker','colMap','subjectsConfig'].forEach(id => { const el = document.getElementById(id); if (el.classList) el.classList.remove('show'); });
+  document.getElementById('controlsRow').style.display = 'none';
+  document.getElementById('statementWrap').classList.remove('show');
+  document.getElementById('fileInput').value = '';
+  showError('');
+}
+
+// ═══════════════════════════════════════════════════
+// AUTO-DETECT
+// ═══════════════════════════════════════════════════
+function findCol(hdrs, ...kws) {
+  for (const kw of kws) { const i = hdrs.findIndex(h => h.toLowerCase().includes(kw.toLowerCase())); if (i !== -1) return i; }
+  return -1;
+}
+
+function detectAndSetup(rows) {
+  let hdrIdx = -1;
+  for (let i = 0; i < Math.min(rows.length, 10); i++) {
+    const s = rows[i].join(' ').toLowerCase();
+    if ((s.includes('name') || s.includes('roll')) && rows[i].filter(c=>c!=='').length > 2) { hdrIdx = i; break; }
+  }
+  if (hdrIdx === -1) { showError('Could not detect header row. Make sure the sheet has columns like Roll No., Name, etc.'); return; }
+  headers = rows[hdrIdx].map(h => String(h).trim());
+  showError('');
+  buildColMap(headers);
+  detectSubjects(rows, hdrIdx);
+  document.getElementById('colMap').classList.add('show');
+  document.getElementById('subjectsConfig').classList.add('show');
+  parseAndRenderPicker(rows, hdrIdx);
+}
+
+function buildColMap(hdrs) {
+  const grid = document.getElementById('colMapGrid'); grid.innerHTML = '';
+  const fields = [
+    { id:'map-roll', label:'Roll No.', kw:['roll'] },
+    { id:'map-adm',  label:'Adm / Reg No.', kw:['ad no','adm','reg','admission'] },
+    { id:'map-name', label:'Student Name', kw:['name'] },
+    { id:'map-gender', label:'Gender (B/G)', kw:['b/g','gender','sex'] },
+    { id:'map-total', label:'Total Marks', kw:['total'] },
+    { id:'map-pct',   label:'Percentage / %age', kw:['%age','percent','pct'] },
+    { id:'map-result', label:'Result', kw:['result','status'] },
+  ];
+  fields.forEach(f => {
+    const auto = findCol(hdrs, ...f.kw);
+    const div = document.createElement('div'); div.className = 'field-group';
+    div.innerHTML = `<label>${f.label}</label><select id="${f.id}" onchange="parseAndRenderPicker(sheetData,getHdrIdx())">
+      <option value="-1">— not mapped —</option>
+      ${hdrs.map((h,i)=>`<option value="${i}"${i===auto?' selected':''}>${h||'col '+(i+1)}</option>`).join('')}
+    </select>`;
+    grid.appendChild(div);
+  });
+}
+
+function getHdrIdx() {
+  for (let i = 0; i < Math.min(sheetData.length, 10); i++) {
+    const s = sheetData[i].join(' ').toLowerCase();
+    if ((s.includes('name') || s.includes('roll')) && sheetData[i].filter(c=>c!=='').length > 2) return i;
+  }
+  return 0;
+}
+
+function getColMap() {
+  return {
+    roll:   +document.getElementById('map-roll').value,
+    adm:    +document.getElementById('map-adm').value,
+    name:   +document.getElementById('map-name').value,
+    gender: +document.getElementById('map-gender').value,
+    total:  +document.getElementById('map-total').value,
+    pct:    +document.getElementById('map-pct').value,
+    result: +document.getElementById('map-result').value,
+  };
+}
+
+function detectSubjects(rows, hdrIdx) {
+  let fdr = hdrIdx + 1;
+  const maybe = rows[fdr] || [];
+  const ne = maybe.filter(c=>c!=='');
+  if (ne.length > 2 && ne.every(c=>!isNaN(parseFloat(c)))) fdr++;
+
+  const metaCols = new Set();
+  [['roll'],['ad no','adm','reg'],['name'],['b/g','gender'],['total'],['%age','percent'],['result','status']]
+    .forEach(kws => { const i = findCol(headers,...kws); if (i>=0) metaCols.add(i); });
+
+  subjectConfig = [];
+  headers.forEach((h, i) => {
+    if (metaCols.has(i) || !h) return;
+    let n = 0;
+    for (let r = fdr; r < Math.min(fdr+5, rows.length); r++) { if (rows[r][i]!=='' && !isNaN(parseFloat(rows[r][i]))) n++; }
+    if (n >= 1) subjectConfig.push({ label: h, colIndex: i });
+  });
+  subjectConfig = subjectConfig.slice(0, 12);
+  renderSubjectRows();
+}
+
+function renderSubjectRows() {
+  const c = document.getElementById('subjectRows'); c.innerHTML = '';
+  subjectConfig.forEach((s,i) => addSubjectRowWith(s.label, s.colIndex, i));
+}
+function addSubjectRow() { subjectConfig.push({ label:'', colIndex:-1 }); renderSubjectRows(); }
+function addSubjectRowWith(lbl, ci, idx) {
+  const c = document.getElementById('subjectRows');
+  const div = document.createElement('div'); div.className = 'subject-row'; div.dataset.idx = idx;
+  div.innerHTML = `<input type="text" placeholder="Subject name" value="${lbl}" onchange="subjectConfig[${idx}].label=this.value">
+    <select onchange="subjectConfig[${idx}].colIndex=+this.value">
+      <option value="-1">— column —</option>
+      ${headers.map((h,i)=>`<option value="${i}"${i===ci?' selected':''}>${h||'col '+(i+1)}</option>`).join('')}
+    </select>
+    <button class="del-btn" onclick="subjectConfig.splice(${idx},1);renderSubjectRows()">×</button>`;
+  c.appendChild(div);
+}
+
+// ═══════════════════════════════════════════════════
+// PARSE STUDENTS & RANKINGS
+// ═══════════════════════════════════════════════════
+function parseAndRenderPicker(rows, hdrIdx) {
+  const cm = getColMap();
+  let fdr = hdrIdx + 1;
+  const maybe = rows[fdr] || [];
+  const ne = maybe.filter(c=>c!=='');
+  if (ne.length > 2 && ne.every(c=>!isNaN(parseFloat(c)))) fdr++;
+
+  students = [];
+  for (let r = fdr; r < rows.length; r++) {
+    const row = rows[r];
+    if (!row || row.every(c=>c==='')) continue;
+    const name = cm.name >= 0 ? String(row[cm.name]||'').trim() : '';
+    if (!name) continue;
+    const total = cm.total >= 0 ? parseFloat(row[cm.total]) : NaN;
+    const pct   = cm.pct   >= 0 ? parseFloat(row[cm.pct])   : NaN;
+    students.push({ _row: row, name, total, pct });
+  }
+
+  // Compute rank by total marks (or pct)
+  const ranked = [...students].sort((a,b) => {
+    const va = isNaN(a.total) ? (isNaN(a.pct)?0:a.pct) : a.total;
+    const vb = isNaN(b.total) ? (isNaN(b.pct)?0:b.pct) : b.total;
+    return vb - va;
+  });
+  let rank = 1;
+  ranked.forEach((s, i) => {
+    if (i > 0) {
+      const prev = ranked[i-1];
+      const vp = isNaN(prev.total)?prev.pct:prev.total;
+      const vc = isNaN(s.total)?s.pct:s.total;
+      if (vp !== vc) rank = i + 1;
+    }
+    s.rank = rank;
+  });
+  students.forEach(s => { s.rank = ranked.find(r => r === s)?.rank || '—'; });
+
+  const sel = document.getElementById('studentSelect');
+  sel.innerHTML = '<option value="">— Choose a student —</option>';
+  students.forEach((s, i) => {
+    const roll = cm.roll >= 0 ? (s._row[cm.roll]||'') : '';
+    const opt = document.createElement('option');
+    opt.value = i; opt.textContent = (roll?roll+'. ':'') + s.name;
+    sel.appendChild(opt);
+  });
+
+  document.getElementById('controlsRow').style.display = students.length ? 'flex' : 'none';
+  document.getElementById('printAllBtn').style.display = students.length ? 'inline-flex' : 'none';
+  document.getElementById('statementWrap').classList.remove('show');
+  document.getElementById('printBtn').style.display = 'none';
+  editedMarks = {};
+}
+
+// ═══════════════════════════════════════════════════
+// SHOW STATEMENT
+// ═══════════════════════════════════════════════════
+function showStatement() {
+  const idx = parseInt(document.getElementById('studentSelect').value);
+  if (isNaN(idx) || idx < 0) {
+    document.getElementById('statementWrap').classList.remove('show');
+    document.getElementById('printBtn').style.display = 'none';
+    return;
+  }
+  renderStatementFor(idx, document.getElementById('statementCard'), true);
+  document.getElementById('statementWrap').classList.add('show');
+  document.getElementById('printBtn').style.display = 'inline-flex';
+  renderCoschoDisplay();
+  // restore remarks
+  document.getElementById('remarksInput').value = sessionStorage.getItem(`remarks_${idx}`) || '';
+}
+
+function renderStatementFor(idx, card, interactive) {
+  const cm = getColMap();
+  const s = students[idx]._row;
+  const minOverall = parseFloat(document.getElementById('minOverallPct').value) || 33;
+  const minSubj    = parseFloat(document.getElementById('minSubjectMarks').value) || 33;
+
+  const school = document.getElementById('schoolName').value.trim() || 'School Name';
+  const cls    = document.getElementById('className').value.trim() || '';
+  const yr     = document.getElementById('academicYear').value.trim() || '';
+  const exam   = document.getElementById('examName').value.trim() || '';
+
+  card.querySelector('[id$="disp-school"]') && (card.querySelector('[id$="disp-school"]').textContent = school);
+  const dispSchool = card.querySelector('.stmt-school-name'); if(dispSchool) dispSchool.textContent = school;
+  const dispSub    = card.querySelector('.stmt-school-sub');  if(dispSub) dispSub.textContent = cls || '';
+  const dispExam   = card.querySelector('#disp-exam-name, [data-role="disp-exam-name"]'); if(dispExam) { dispExam.textContent = exam; dispExam.style.display = exam ? '' : 'none'; }
+  const dispYr     = card.querySelector('#disp-acad-year, [data-role="disp-acad-year"]');   if(dispYr)   { dispYr.textContent   = yr;   dispYr.style.display   = yr   ? '' : 'none'; }
+
+  // Logo
+  const logoEl = card.querySelector('.stmt-logo');
+  if (logoEl) { logoEl.src = logoDataURL||''; logoEl.style.display = logoDataURL ? 'block' : 'none'; }
+
+  // Meta — 5 fields including rank
+  const metaDiv = card.querySelector('.student-meta');
+  const metaFields = [
+    { label: L('name'),   val: cm.name   >= 0 ? s[cm.name]   : '' },
+    { label: L('rollNo'), val: cm.roll   >= 0 ? s[cm.roll]   : '' },
+    { label: L('admNo'),  val: cm.adm    >= 0 ? s[cm.adm]    : '' },
+    { label: L('gender'), val: cm.gender >= 0 ? genderLabel(s[cm.gender]) : '' },
+    { label: L('rank'),   val: students[idx].rank !== undefined ? students[idx].rank : '—' },
+  ];
+  if (metaDiv) metaDiv.innerHTML = metaFields.map(f =>
+    `<div class="meta-item"><div class="meta-label">${f.label}</div><div class="meta-val">${f.val||'—'}</div></div>`
+  ).join('');
+
+  // Subject rows
+  const tbody = card.querySelector('tbody');
+  tbody.innerHTML = '';
+  let subCount = 0, anyFail = false, failCount = 0;
+  subjectConfig.forEach((sub, si) => {
+    if (sub.colIndex < 0 || !sub.label) return;
+    const raw = (editedMarks[idx] && editedMarks[idx][si] !== undefined)
+      ? editedMarks[idx][si]
+      : s[sub.colIndex];
+    const marks = parseFloat(raw);
+    if (isNaN(marks)) return;
+    subCount++;
+    const grade = getGrade(marks);
+    const failed = marks < minSubj;
+    if (failed) { anyFail = true; failCount++; }
+    const tr = document.createElement('tr');
+    if (failed) tr.className = 'fail-row';
+
+    const marksTd = interactive
+      ? `<td class="editable-mark${failed?' fail-mark':''}" title="Click to edit" onclick="startEdit(this,${idx},${si})">${marks.toFixed(2)}</td>`
+      : `<td class="${failed?'fail-mark':''}">${marks.toFixed(2)}</td>`;
+
+    tr.innerHTML = `<td>${sub.label}</td>${marksTd}
+      <td>${marks.toFixed(1)}%</td>
+      <td class="grade g-${grade}">${grade}</td>
+      <td style="font-size:11px;font-weight:700;color:${failed?'var(--danger-text)':'var(--success-text)'}">${failed?L('fail'):L('pass')}</td>`;
+    tbody.appendChild(tr);
+  });
+
+  // Totals
+  const totalRaw = cm.total >= 0 ? parseFloat(s[cm.total]) : NaN;
+  const pctRaw   = cm.pct   >= 0 ? parseFloat(s[cm.pct])   : NaN;
+  const maxMarks = subCount * 100;
+  const effectivePct = isNaN(pctRaw) ? (isNaN(totalRaw) ? NaN : totalRaw/maxMarks*100) : pctRaw;
+  const overallFail = (!isNaN(effectivePct) && effectivePct < minOverall) || anyFail;
+  const overallGrade = isNaN(effectivePct) ? '—' : getGrade(effectivePct);
+
+  const stTotal = card.querySelector('#st-total, [data-role="st-total"]');
+  const stPct   = card.querySelector('#st-pct,   [data-role="st-pct"]');
+  const stGrade = card.querySelector('#st-overall-grade, [data-role="st-overall-grade"]');
+  const stStat  = card.querySelector('#st-overall-status, [data-role="st-overall-status"]');
+  if(stTotal) stTotal.textContent = isNaN(totalRaw) ? '—' : totalRaw.toFixed(2)+' / '+maxMarks;
+  if(stPct)   stPct.textContent   = isNaN(effectivePct) ? '—' : effectivePct.toFixed(2)+'%';
+  if(stGrade) stGrade.innerHTML   = `<span class="grade g-${overallGrade}">${overallGrade}</span>`;
+  if(stStat)  { const rb = computeResultBadge(failCount); stStat.innerHTML = `<span style="font-size:11px;font-weight:700;color:${failCount>=3?'var(--danger-text)':(failCount===2?'var(--warn-text)':'var(--success-text)')}">${rb.text}</span>`; }
+
+  card.querySelector('#totalNote') && (card.querySelector('#totalNote').textContent = subCount ? `Out of ${maxMarks} marks total` : '');
+
+  // Result badge
+  const resultRaw = cm.result >= 0 ? String(s[cm.result]||'').trim() : '';
+  const badge = card.querySelector('.result-badge');
+  if (badge) {
+    const rb = computeResultBadge(failCount);
+    badge.textContent = rb.text;
+    badge.className = rb.className;
+  }
+}
+
+// ═══════════════════════════════════════════════════
+// INLINE EDIT
+// ═══════════════════════════════════════════════════
+function startEdit(td, studentIdx, subjectIdx) {
+  if (td.querySelector('input')) return;
+  const current = td.textContent.trim();
+  const input = document.createElement('input');
+  input.type = 'text'; input.value = current; input.style.width = '65px';
+  td.innerHTML = ''; td.appendChild(input);
+  input.focus(); input.select();
+  function commit() {
+    const val = parseFloat(input.value);
+    if (!isNaN(val) && val >= 0 && val <= 100) {
+      if (!editedMarks[studentIdx]) editedMarks[studentIdx] = {};
+      editedMarks[studentIdx][subjectIdx] = val;
+    }
+    showStatement();
+  }
+  input.addEventListener('blur', commit);
+  input.addEventListener('keydown', e => { if (e.key==='Enter') commit(); if(e.key==='Escape') showStatement(); });
+}
+
+// ═══════════════════════════════════════════════════
+// REMARKS
+// ═══════════════════════════════════════════════════
+document.addEventListener('DOMContentLoaded', () => {
+  const ri = document.getElementById('remarksInput');
+  if (ri) ri.addEventListener('input', () => {
+    const idx = parseInt(document.getElementById('studentSelect').value);
+    if (!isNaN(idx)) sessionStorage.setItem(`remarks_${idx}`, ri.value);
+  });
+});
+
+// ═══════════════════════════════════════════════════
+// PRINT SINGLE
+// ═══════════════════════════════════════════════════
+function printSingle() {
+  const idx = parseInt(document.getElementById('studentSelect').value);
+  if (isNaN(idx)) return;
+  const remarks = document.getElementById('remarksInput').value.trim();
+  document.getElementById('remarksText').textContent = remarks;
+  document.getElementById('remarksDisplay').style.display = remarks ? 'block' : 'none';
+  window.print();
+}
+
+// ═══════════════════════════════════════════════════
+// PRINT ALL
+// ═══════════════════════════════════════════════════
+function printAll() {
+  if (!students.length) return;
+  const container = document.getElementById('printAllContainer');
+  container.innerHTML = '';
+
+  students.forEach((stu, idx) => {
+    const card = document.getElementById('statementCard').cloneNode(true);
+    // Clear IDs to avoid duplicates
+    card.querySelectorAll('[id]').forEach(el => el.removeAttribute('id'));
+    card.style.marginBottom = '0';
+
+    // Render into cloned card
+    renderStatementForClone(idx, card);
+
+    // Co-scholastic
+    const cosShow = document.getElementById('cosChoToggle').checked;
+    const coschoSec = card.querySelector('.coscho-section');
+    if (coschoSec) {
+      if (cosShow) {
+        coschoSec.classList.add('show');
+        const tbl = coschoSec.querySelector('.coscho-table');
+        if (tbl) {
+          tbl.innerHTML = '';
+          coschoItems.forEach((item, i) => {
+            const val = sessionStorage.getItem(`coscho_${idx}_${i}`) || '';
+            const tr = document.createElement('tr');
+            tr.innerHTML = `<td>${item.label||'—'}</td><td style="text-align:center">${val||'—'}</td>`;
+            tbl.appendChild(tr);
+          });
+        }
+      } else {
+        coschoSec.classList.remove('show');
+        coschoSec.style.display = 'none';
+      }
+    }
+
+    // Remarks
+    const remarks = sessionStorage.getItem(`remarks_${idx}`) || '';
+    const rd = card.querySelector('.remarks-display');
+    if (rd) { rd.style.display = remarks ? 'block' : 'none'; const rt = rd.querySelector('.remarks-text'); if(rt) rt.textContent = remarks; }
+    const rs = card.querySelector('.remarks-section');
+    if (rs) rs.style.display = 'none';
+
+    // Page break wrapper
+    const wrapper = document.createElement('div');
+    if (idx > 0) wrapper.className = 'page-break';
+    wrapper.appendChild(card);
+    container.appendChild(wrapper);
+  });
+
+  // Show container, hide main, print, restore
+  container.style.display = 'block';
+  document.querySelector('.app').style.display = 'none';
+  window.print();
+  setTimeout(() => {
+    container.style.display = 'none';
+    document.querySelector('.app').style.display = 'block';
+    container.innerHTML = '';
+  }, 1000);
+}
+
+function renderStatementForClone(idx, card) {
+  const cm = getColMap();
+  const s = students[idx]._row;
+  const minOverall = parseFloat(document.getElementById('minOverallPct').value) || 33;
+  const minSubj    = parseFloat(document.getElementById('minSubjectMarks').value) || 33;
+  const school = document.getElementById('schoolName').value.trim() || 'School Name';
+  const cls    = document.getElementById('className').value.trim() || '';
+  const yr     = document.getElementById('academicYear').value.trim() || '';
+  const exam   = document.getElementById('examName').value.trim() || '';
+
+  const dsn = card.querySelector('.stmt-school-name'); if(dsn) dsn.textContent = school;
+  const dss = card.querySelector('.stmt-school-sub');  if(dss) dss.textContent = cls || '';
+  const dispExam = card.querySelector('#disp-exam-name, [data-role="disp-exam-name"]'); if(dispExam) { dispExam.textContent = exam; dispExam.style.display = exam ? '' : 'none'; }
+  const dispYr   = card.querySelector('#disp-acad-year, [data-role="disp-acad-year"]');   if(dispYr)   { dispYr.textContent   = yr;   dispYr.style.display   = yr   ? '' : 'none'; }
+  const logoEl = card.querySelector('.stmt-logo');
+  if (logoEl) { logoEl.src = logoDataURL||''; logoEl.style.display = logoDataURL?'block':'none'; }
+
+  const metaDiv = card.querySelector('.student-meta');
+  const metaFields = [
+    { label: L('name'),   val: cm.name   >= 0 ? s[cm.name]   : '' },
+    { label: L('rollNo'), val: cm.roll   >= 0 ? s[cm.roll]   : '' },
+    { label: L('admNo'),  val: cm.adm    >= 0 ? s[cm.adm]    : '' },
+    { label: L('gender'), val: cm.gender >= 0 ? genderLabel(s[cm.gender]) : '' },
+    { label: L('rank'),   val: students[idx].rank !== undefined ? students[idx].rank : '—' },
+  ];
+  if (metaDiv) metaDiv.innerHTML = metaFields.map(f =>
+    `<div class="meta-item"><div class="meta-label">${f.label}</div><div class="meta-val">${f.val||'—'}</div></div>`
+  ).join('');
+
+  const tbody = card.querySelector('tbody'); tbody.innerHTML = '';
+  let subCount = 0, anyFail = false, failCount = 0;
+  subjectConfig.forEach((sub, si) => {
+    if (sub.colIndex < 0 || !sub.label) return;
+    const raw = (editedMarks[idx] && editedMarks[idx][si] !== undefined) ? editedMarks[idx][si] : s[sub.colIndex];
+    const marks = parseFloat(raw); if (isNaN(marks)) return;
+    subCount++;
+    const grade = getGrade(marks); const failed = marks < minSubj; if(failed) { anyFail=true; failCount++; }
+    const tr = document.createElement('tr'); if(failed) tr.className='fail-row';
+    tr.innerHTML = `<td>${sub.label}</td><td class="${failed?'fail-mark':''}">${marks.toFixed(2)}</td>
+      <td>${marks.toFixed(1)}%</td><td class="grade g-${grade}">${grade}</td>
+      <td style="font-size:11px;font-weight:700;color:${failed?'var(--danger-text)':'var(--success-text)'}">${failed?L('fail'):L('pass')}</td>`;
+    tbody.appendChild(tr);
+  });
+
+  const totalRaw = cm.total >= 0 ? parseFloat(s[cm.total]) : NaN;
+  const pctRaw   = cm.pct   >= 0 ? parseFloat(s[cm.pct])   : NaN;
+  const maxMarks = subCount * 100;
+  const effectivePct = isNaN(pctRaw) ? (isNaN(totalRaw)?NaN:totalRaw/maxMarks*100) : pctRaw;
+  const overallFail  = (!isNaN(effectivePct) && effectivePct < minOverall) || anyFail;
+  const overallGrade = isNaN(effectivePct) ? '—' : getGrade(effectivePct);
+
+  const cells = card.querySelectorAll('tfoot td');
+  if(cells[1]) cells[1].textContent = isNaN(totalRaw)?'—':totalRaw.toFixed(2)+' / '+maxMarks;
+  if(cells[2]) cells[2].textContent = isNaN(effectivePct)?'—':effectivePct.toFixed(2)+'%';
+  if(cells[3]) cells[3].innerHTML   = `<span class="grade g-${overallGrade}">${overallGrade}</span>`;
+  if(cells[4]) { const rb = computeResultBadge(failCount); cells[4].innerHTML = `<span style="font-size:11px;font-weight:700;color:${failCount>=3?'var(--danger-text)':(failCount===2?'var(--warn-text)':'var(--success-text)')}">${rb.text}</span>`; }
+
+  const note = card.querySelector('.result-note'); if(note) note.textContent = subCount?`Out of ${maxMarks} marks total`:'';
+
+  const resultRaw = cm.result >= 0 ? String(s[cm.result]||'').trim() : '';
+  const badge = card.querySelector('.result-badge');
+  if (badge) {
+    const rb = computeResultBadge(failCount);
+    badge.textContent = rb.text;
+    badge.className = rb.className;
+  }
+
+  // Apply language labels to clone
+  const lblMap = { 'lbl-title':'title','lbl-final':'final','lbl-subject':'subject','lbl-marks':'marks','lbl-pct-col':'pctCol','lbl-grade-col':'gradeCol','lbl-status-col':'statusCol','lbl-total-row':'totalRow','lbl-coscho':'coscho','lbl-remarks-disp':'remarksDisp','lbl-class-teacher':'classTeacher','lbl-principal':'principal' };
+  Object.entries(lblMap).forEach(([, key]) => {
+    const el = card.querySelector(`[data-lbl="${key}"]`);
+    if (el) el.textContent = L(key);
+  });
+}
+
+// ═══════════════════════════════════════════════════
+// HELPERS
+// ═══════════════════════════════════════════════════
+// Returns { text, className } for the result badge based on subject fail count
+function computeResultBadge(failCount) {
+  if (failCount === 0 || failCount === 1) {
+    return { text: L('promoted'), className: 'result-badge badge-promoted' };
+  } else if (failCount === 2) {
+    return { text: L('promotedUnder'), className: 'result-badge badge-consideration' };
+  } else {
+    return { text: L('withheld'), className: 'result-badge badge-fail' };
+  }
+}
+
+function getGrade(pct) {
+  if (pct >= 91) return 'A1'; if (pct >= 81) return 'A2';
+  if (pct >= 71) return 'B1'; if (pct >= 61) return 'B2';
+  if (pct >= 51) return 'C1'; if (pct >= 41) return 'C2';
+  if (pct >= 33) return 'D'; return 'E';
+}
+function genderLabel(v) {
+  if (!v) return '';
+  const s = String(v).trim().toUpperCase();
+  if (s==='B'||s==='M'||s==='MALE') return 'Male';
+  if (s==='G'||s==='F'||s==='FEMALE') return 'Female';
+  return v;
+}
+function showError(msg) {
+  const el = document.getElementById('errorMsg');
+  el.textContent = msg; el.classList.toggle('show', !!msg);
+}
+</script>
+</body>
+</html>
