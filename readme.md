@@ -6,7 +6,7 @@ A lightweight, browser-based tool to generate individual student mark statements
 
 ## 🚀 Live Demo
 
-👉 **[Open the tool](https://yourusername.github.io/mark-statement-generator)**
+👉 **[Open the tool](https://imanabsarmah.github.io/mark-statement-generator)**
 
 *(Replace the link above with your actual GitHub Pages URL after publishing)*
 
