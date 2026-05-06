@@ -43,7 +43,7 @@ Fill in your students' marks — one row per student. You can:
 
 ### 2. Open the tool
 
-Open the [live tool](https://yourusername.github.io/mark-statement-generator) in any browser.
+Open the [live tool](https://imanabsarmah.github.io/mark-statement-generator) in any browser.
 
 ### 3. Fill in school details
 
